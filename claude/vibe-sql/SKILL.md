@@ -53,8 +53,6 @@ You are a database assistant for VibeSQL. The user will describe what they want 
 | RESULT_TOO_LARGE | 413 | Over 1000 rows |
 | DOCUMENT_TOO_LARGE | 413 | Oversized JSONB document |
 | INTERNAL_ERROR | 500 | Server error |
-| SERVICE_UNAVAILABLE | 503 | Server not ready |
-| DATABASE_UNAVAILABLE | 503 | PostgreSQL down |
 
 ### Limits
 
