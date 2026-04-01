@@ -171,18 +171,47 @@ SELECT COUNT(*) as total, SUM(amount) as sum FROM stripe_sales
 SELECT * FROM users ORDER BY id LIMIT 20 OFFSET 40
 ```
 
+## Schema Safety — Sentinel Rules
+
+When modifying schema (CREATE, ALTER, DROP), follow the Sentinel classification:
+
+### Always Do
+- **Before any ALTER or DROP:** Check the table first — `describe_table` to see columns, constraints, row count, FK dependents
+- **Prefer additive operations:** ADD COLUMN (nullable), CREATE TABLE, CREATE INDEX — these are always safe
+- **Use `analyze_change` first:** Pre-flight any DDL to see the Sentinel risk code before executing
+- **Simple migrations:** Adding a column with DEFAULT + NOT NULL is safe — just do it
+
+### Never Do
+- **Never DROP TABLE without showing the user the row count and FK dependents first**
+- **Never ALTER TABLE DROP COLUMN without confirming the column has no data the user needs**
+- **Never use full schema replace when adding a table — use the AddTable endpoint or CREATE TABLE**
+- **Never TRUNCATE without explicit user confirmation**
+- **Never change column types without checking if existing data is compatible**
+
+### Risk Levels (Sentinel Taxonomy)
+| Level | Codes | Meaning | Action |
+|-------|-------|---------|--------|
+| SAFE | S-100 to S-109 | No data impact | Execute immediately |
+| MIGRATION | M-200 to M-205 | Requires data check | Check then execute |
+| DESTRUCTIVE | D-300 to D-312 | May lose data | Show impact, get user confirmation |
+| PROHIBITED | P-400 to P-404 | Catastrophic risk | Block — suggest safer alternative |
+
+### The Praveen Rule
+If a user asks to "create a table" in an existing schema, ADD the table. Do NOT replace the entire schema with just that one table. Additive, not destructive.
+
 ## Instructions
 
 1. Read the user's natural language request
 2. Translate to PostgreSQL SQL (never SQLite)
-3. Execute via curl against the VibeSQL API
-4. Parse the JSON response
-5. If `success: true` — present `rows` in a readable table format, note `rowCount` and `executionTime`
-6. If `success: false` — show the error clearly, explain what went wrong, suggest a fix
-7. For exploration requests (e.g. "show me all tables"), start with `information_schema`
-8. For INSERT, always use `RETURNING` to show what was created
-9. Before DROP or TRUNCATE, confirm with the user
-10. For UPDATE/DELETE, always include WHERE — warn if the user's request would affect all rows
+3. **For DDL: classify the change risk first** — if destructive, show impact and ask for confirmation
+4. Execute via curl against the VibeSQL API
+5. Parse the JSON response
+6. If `success: true` — present `rows` in a readable table format, note `rowCount` and `executionTime`
+7. If `success: false` — show the error clearly, explain what went wrong, suggest a fix
+8. For exploration requests (e.g. "show me all tables"), start with `information_schema`
+9. For INSERT, always use `RETURNING` to show what was created
+10. Before DROP or TRUNCATE, **always show row count and FK dependents, then confirm with the user**
+11. For UPDATE/DELETE, always include WHERE — warn if the user's request would affect all rows
 
 ## User Argument
 
